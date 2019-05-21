@@ -3,18 +3,11 @@ package implementation;
 import code.GuiException;
 import gui.Constants;
 
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
-import java.io.FileReader;
-import java.io.FileWriter;
-import java.io.IOException;
+import java.io.*;
 import java.math.BigInteger;
-import java.security.InvalidKeyException;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.KeyStore;
-import java.security.KeyStore.PrivateKeyEntry;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
 import java.security.NoSuchProviderException;
@@ -23,49 +16,25 @@ import java.security.Provider;
 import java.security.PublicKey;
 import java.security.SecureRandom;
 import java.security.Security;
-import java.security.SignatureException;
-import java.security.UnrecoverableEntryException;
 import java.security.UnrecoverableKeyException;
 import java.security.cert.Certificate;
 import java.security.cert.CertificateEncodingException;
 import java.security.cert.CertificateException;
-import java.security.cert.CertificateExpiredException;
 import java.security.cert.CertificateFactory;
-import java.security.cert.CertificateNotYetValidException;
 import java.security.cert.CertificateParsingException;
 import java.security.cert.X509Certificate;
 import java.security.spec.ECParameterSpec;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Enumeration;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
-import javax.security.auth.x500.X500Principal;
-
-import org.bouncycastle.asn1.ASN1ObjectIdentifier;
-import org.bouncycastle.asn1.ASN1Sequence;
 import org.bouncycastle.asn1.x500.X500Name;
-import org.bouncycastle.asn1.x509.AlgorithmIdentifier;
-import org.bouncycastle.asn1.x509.ExtendedKeyUsage;
-import org.bouncycastle.asn1.x509.Extension;
-import org.bouncycastle.asn1.x509.GeneralName;
-import org.bouncycastle.asn1.x509.GeneralNames;
-import org.bouncycastle.asn1.x509.KeyPurposeId;
-import org.bouncycastle.asn1.x509.KeyUsage;
-import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo;
-import org.bouncycastle.asn1.x9.X9ObjectIdentifiers;
+import org.bouncycastle.asn1.x509.*;
 import org.bouncycastle.cert.CertIOException;
 import org.bouncycastle.cert.X509v3CertificateBuilder;
 import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
 import org.bouncycastle.cert.jcajce.JcaX509CertificateHolder;
-import org.bouncycastle.cert.jcajce.JcaX509v3CertificateBuilder;
-import org.bouncycastle.cms.CMSException;
-import org.bouncycastle.cms.CMSProcessableByteArray;
-import org.bouncycastle.cms.CMSSignedData;
-import org.bouncycastle.cms.CMSSignedDataGenerator;
-import org.bouncycastle.cms.CMSTypedData;
+import org.bouncycastle.cms.*;
 import org.bouncycastle.jcajce.provider.asymmetric.dsa.BCDSAPublicKey;
+import org.bouncycastle.jcajce.provider.asymmetric.ec.BCECPublicKey;
 import org.bouncycastle.jcajce.provider.asymmetric.rsa.BCRSAPublicKey;
 import org.bouncycastle.jce.ECNamedCurveTable;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
@@ -82,14 +51,15 @@ import org.bouncycastle.util.io.pem.PemObject;
 import org.bouncycastle.util.io.pem.PemReader;
 
 import sun.security.ec.ECPrivateKeyImpl;
-import sun.security.ec.ECPublicKeyImpl;
 import sun.security.provider.DSAPublicKey;
 import sun.security.provider.DSAPublicKeyImpl;
 import sun.security.rsa.RSAPublicKeyImpl;
+
 import x509.v3.CodeV3;
+import x509.v3.GuiV3;
 
 public class MyCode extends CodeV3 {
-	
+
 	private static Provider BCProvider = new BouncyCastleProvider();
 	
 	private KeyStore keyStore;
@@ -114,8 +84,7 @@ public class MyCode extends CodeV3 {
 			e.printStackTrace();
 			return false;
 		}
-		if (cert.getKeyUsage()[5]) { return true; } 
-		else { return false; }
+        return cert.getKeyUsage()[5];
 	}
 
 	@Override
@@ -136,7 +105,7 @@ public class MyCode extends CodeV3 {
 			pemWriter.close();
 			fw.close();
 			return true;
-		} catch (KeyStoreException | UnrecoverableKeyException | NoSuchAlgorithmException | OperatorCreationException | IOException e) {
+		} catch (IOException | KeyStoreException | NoSuchAlgorithmException | UnrecoverableKeyException | OperatorCreationException e) {
 			e.printStackTrace();
 			return false;
 		}
@@ -157,8 +126,8 @@ public class MyCode extends CodeV3 {
                     jcaPEMWriter.writeObject(cert);
                 } else if (format == 1) { // ENTIRE CHAIN
                     Certificate[] chain = keyStore.getCertificateChain(keypair_name);
-                    for (int j = 0; j < chain.length; j++) {
-                        jcaPEMWriter.writeObject(chain[j]);
+                    for (Certificate aChain : chain) {
+                        jcaPEMWriter.writeObject(aChain);
                     }
                 }
                 jcaPEMWriter.close();
@@ -174,16 +143,13 @@ public class MyCode extends CodeV3 {
 	public boolean exportKeypair(String keypair_name, String file, String password) {
 		try {
 			KeyStore ks = KeyStore.getInstance("PKCS12", "BC");
-			ks.load(null, keyStorePass);
+			ks.load(null, null);
             PrivateKey privateKey = (PrivateKey) keyStore.getKey(keypair_name, keyStorePass);
             Certificate[] certs = keyStore.getCertificateChain(keypair_name);
-            System.out.println(certs.length);
-            for (Certificate cert : certs) {
-            	System.out.println(cert);
-            }
-            ks.setKeyEntry(keypair_name, privateKey, keyStorePass, certs);
+            ks.setKeyEntry(keypair_name, privateKey, password.toCharArray(), certs);
             FileOutputStream fos = new FileOutputStream(file);
             ks.store(fos, password.toCharArray());
+            fos.flush();
             fos.close();
             return true;
         } catch (IOException | KeyStoreException | UnrecoverableKeyException | CertificateException | NoSuchAlgorithmException | NoSuchProviderException e) {
@@ -191,7 +157,7 @@ public class MyCode extends CodeV3 {
             return false;
         }
 	}
-    
+
 	@Override
 	public String getCertPublicKeyAlgorithm(String keypair_name) {
 		try {
@@ -207,27 +173,29 @@ public class MyCode extends CodeV3 {
 	public String getCertPublicKeyParameter(String keypair_name) {
 		try {
             X509Certificate cert = (X509Certificate) keyStore.getCertificate(keypair_name);
-            if (cert.getPublicKey().getAlgorithm().equals("RSA")) {
-                java.security.interfaces.RSAPublicKey rsaPublicKey = (java.security.interfaces.RSAPublicKey) cert.getPublicKey();
-                return String.valueOf(rsaPublicKey.getModulus().bitLength());
-            } else if (cert.getPublicKey().getAlgorithm().equals("EC")) {
-                ECPrivateKeyImpl ecPrivateKey = (ECPrivateKeyImpl) keyStore.getKey(keypair_name, keyStorePass);
-                ECParameterSpec ecParameterSpec = ecPrivateKey.getParams();
-                String[][] curves_by_set = new String[][]{
-                	{"prime256v1"}, 
-                	{"secp256k1", "secp256r1", "secp384r1", "secp521r1", "sect283k1", "sect283r1", "sect409k1", "sect409r1", "sect571k1", "sect571r1"}, 
-                	{"P-256", "P-384", "P-521", "B-283", "B-409", "B-571"}
-                };
-                for (int i = 0; i < 3; i++) {
-                    for (int j = 0; j < curves_by_set[i].length; j++) {
-                        if (ecParameterSpec.toString().substring(0, curves_by_set[i][j].length()).equals(ECNamedCurveTable.getParameterSpec(curves_by_set[i][j]).getName())) {
-                        	return curves_by_set[i][j];
+            switch (cert.getPublicKey().getAlgorithm()) {
+                case "RSA":
+                    java.security.interfaces.RSAPublicKey rsaPublicKey = (java.security.interfaces.RSAPublicKey) cert.getPublicKey();
+                    return String.valueOf(rsaPublicKey.getModulus().bitLength());
+                case "EC":
+                    ECPrivateKeyImpl ecPrivateKey = (ECPrivateKeyImpl) keyStore.getKey(keypair_name, keyStorePass);
+                    ECParameterSpec ecParameterSpec = ecPrivateKey.getParams();
+                    String[][] curves_by_set = new String[][]{
+                            {"prime256v1"},
+                            {"secp256k1", "secp256r1", "secp384r1", "secp521r1", "sect283k1", "sect283r1", "sect409k1", "sect409r1", "sect571k1", "sect571r1"},
+                            {"P-256", "P-384", "P-521", "B-283", "B-409", "B-571"}
+                    };
+                    for (int i = 0; i < 3; i++) {
+                        for (int j = 0; j < curves_by_set[i].length; j++) {
+                            if (ecParameterSpec.toString().substring(0, curves_by_set[i][j].length()).equals(ECNamedCurveTable.getParameterSpec(curves_by_set[i][j]).getName())) {
+                                return curves_by_set[i][j];
+                            }
                         }
                     }
-                }
-            } else if (cert.getPublicKey().getAlgorithm().equals("DSA")) {
-                DSAPublicKey dsaPublicKey = (DSAPublicKey) cert.getPublicKey();
-                return String.valueOf(dsaPublicKey.getParams().getP().bitLength());
+                    break;
+                case "DSA":
+                    DSAPublicKey dsaPublicKey = (DSAPublicKey) cert.getPublicKey();
+                    return String.valueOf(dsaPublicKey.getParams().getP().bitLength());
             }
             return null;
         } catch (KeyStoreException | UnrecoverableKeyException | NoSuchAlgorithmException e) {
@@ -240,9 +208,9 @@ public class MyCode extends CodeV3 {
 	public String getSubjectInfo(String keypair_name) {
 		try {
 			X509Certificate cert = (X509Certificate) keyStore.getCertificate(keypair_name);
-			String ret = cert.getSubjectX500Principal().toString().replaceAll(", ", ",") + 
-					",SA=" + getCertPublicKeyAlgorithm(keypair_name);
-			return ret;
+            return cert.getSubjectX500Principal().toString().replaceAll(", ", ",") +
+                    ",SA=" + getCertPublicKeyAlgorithm(keypair_name);
+
 		} catch (KeyStoreException e) {
 			e.printStackTrace();
 			return "";
@@ -256,10 +224,8 @@ public class MyCode extends CodeV3 {
 
             FileInputStream fis = new FileInputStream(file);
             CertificateFactory factory = CertificateFactory.getInstance("X.509");
-            Collection<X509Certificate> colelction = (Collection<X509Certificate>) factory.generateCertificates(fis);
-            ArrayList<java.security.cert.Certificate> certs = new ArrayList<>();
-
-            for (X509Certificate cert : colelction){ certs.add(cert); }
+            Collection<X509Certificate> collection = (Collection<X509Certificate>) factory.generateCertificates(fis);
+            ArrayList<java.security.cert.Certificate> certs = new ArrayList<>(collection);
             java.security.cert.Certificate[] chain = new java.security.cert.Certificate[certs.size()];
             for(int i = 0; i<chain.length; i++){
                 chain[i] = certs.get(i);
@@ -275,7 +241,7 @@ public class MyCode extends CodeV3 {
                 loadKeypair(keypair_name);
                 return true;
             } else {
-            	access.reportError("Wrong certificate!");
+            	GuiV3.reportError("Wrong certificate!");
             	return false;
             }
 		} catch (IOException | CertificateException | UnrecoverableKeyException | KeyStoreException | NoSuchAlgorithmException e) {
@@ -300,7 +266,6 @@ public class MyCode extends CodeV3 {
 			if (alg.endsWith("DSA")) { ret = ret + "DSA"; }
 			else if (alg.endsWith("RSA")) { ret = ret + "RSA"; }
 			else { ret = ret + "EC"; }
-			System.out.println(ret);
 			return ret;
 		} catch (IOException e) {
 			e.printStackTrace();
@@ -350,8 +315,7 @@ public class MyCode extends CodeV3 {
 		try {
             selectedKeyPair = keypair_name;
             X509Certificate cert = (X509Certificate) keyStore.getCertificate(selectedKeyPair);
-            System.out.println(cert);
-            Integer keySize;
+            int keySize;
             getSubjectInfo(keypair_name);
             if (cert.getPublicKey() instanceof BCDSAPublicKey) {
                 keySize = ((BCDSAPublicKey) cert.getPublicKey()).getY().bitLength();
@@ -360,7 +324,10 @@ public class MyCode extends CodeV3 {
             } else if (cert.getPublicKey() instanceof RSAPublicKeyImpl) {
                 keySize = ((RSAPublicKeyImpl)cert.getPublicKey()).getPublicExponent().bitLength();
             } else if (cert.getPublicKey() instanceof BCRSAPublicKey) {
-                keySize = ((BCRSAPublicKey)cert.getPublicKey()).getPublicExponent().bitLength();
+                keySize = ((BCRSAPublicKey) cert.getPublicKey()).getPublicExponent().bitLength();
+            }
+            else if(cert.getPublicKey() instanceof BCECPublicKey){
+                keySize=42;
             } else {
                 return -1;
             }
@@ -378,8 +345,8 @@ public class MyCode extends CodeV3 {
             access.setNotAfter(holder.getNotAfter());
             if (cert.getVersion() == 3) { access.setVersion(Constants.V3); }
             else { access.setVersion(Constants.V1); }
-            Set<String> criticals = cert.getCriticalExtensionOIDs();
-            access.setCritical(Constants.KU, criticals.contains("2.5.29.15"));
+            Set<String> critical_extensions = cert.getCriticalExtensionOIDs();
+            access.setCritical(Constants.KU, critical_extensions.contains("2.5.29.15"));
             access.setKeyUsage(cert.getKeyUsage());
             if (cert.getExtendedKeyUsage() != null) {
 	            boolean [] extKeyUsage = new boolean [7];
@@ -391,29 +358,22 @@ public class MyCode extends CodeV3 {
 	            	if (key.equals(KeyPurposeId.id_kp_emailProtection.toString())) { extKeyUsage[4] = true; }
 	            	if (key.equals(KeyPurposeId.id_kp_timeStamping.toString())) { extKeyUsage[5] = true; }
 	            	if (key.equals(KeyPurposeId.id_kp_OCSPSigning.toString())) { extKeyUsage[6] = true; }
-	            };
-	            access.setCritical(Constants.EKU, criticals.contains("2.5.29.37"));
+	            }
+	            access.setCritical(Constants.EKU, critical_extensions.contains("2.5.29.37"));
 				access.setExtendedKeyUsage(extKeyUsage);
             }
-			access.setCritical(Constants.SAN, criticals.contains("2.5.29.17"));
+			access.setCritical(Constants.SAN, critical_extensions.contains("2.5.29.17"));
 			StringBuilder sb = new StringBuilder();
 			if (cert.getSubjectAlternativeNames() != null) {
-				for (List<?> pair : cert.getSubjectAlternativeNames()) {
+				for (List pair : cert.getSubjectAlternativeNames()) {
 					sb.append(pair.get(1)).append(",");
 				}
 				sb.setLength(sb.length() - 1);
 			}
 			access.setAlternativeName(5, sb.toString());
-			if (cert.getSubjectX500Principal().equals(cert.getIssuerX500Principal())) {
-				System.out.println("return 0");
-                return 0;
-			} else if (keyStore.isKeyEntry(keypair_name)) {
-                System.out.println("return 1");
-                return 1;
-            } else {
-                System.out.println("return 2");
-                return 2;
-            }
+			if (cert.getSubjectX500Principal().equals(cert.getIssuerX500Principal())) { return 0; }
+			else if (keyStore.isKeyEntry(keypair_name)) { return 1; }
+			else { return 2; }
         } catch (KeyStoreException | CertificateEncodingException | CertificateParsingException e) {
             e.printStackTrace();
             return -1;
@@ -480,7 +440,7 @@ public class MyCode extends CodeV3 {
 	public boolean saveKeypair(String keypair_name) {
 		try {
 			if (!access.getPublicKeyDigestAlgorithm().endsWith("DSA")) {
-				access.reportError("Only DSA is supported!");
+				GuiV3.reportError("Only DSA is supported!");
 				return false;
 			}
 			KeyPair keyPair = generateKeypair(Integer.parseInt(access.getPublicKeyParameter()));
@@ -491,15 +451,14 @@ public class MyCode extends CodeV3 {
 	        keyStore.setKeyEntry(keypair_name, keyPair.getPrivate(), keyStorePass, new Certificate[]{ cert });
 	        dumpKeyStore();
 		    return true;
-	    } catch (IOException | NoSuchAlgorithmException | NoSuchProviderException | InvalidKeyException | SecurityException | SignatureException | KeyStoreException | CertificateException | OperatorCreationException e) {
+	    } catch (IOException | NoSuchAlgorithmException | NoSuchProviderException | OperatorCreationException | CertificateException | KeyStoreException e) {
 	        e.printStackTrace();
 	        return false;
 	    }
 	}
 
-	private X509v3CertificateBuilder pullCertificate(SubjectPublicKeyInfo keyInfo, X509Certificate issuerCert) 
-			throws NoSuchAlgorithmException, NoSuchProviderException, InvalidKeyException, 
-			SecurityException, SignatureException, CertIOException {
+	private X509v3CertificateBuilder pullCertificate(SubjectPublicKeyInfo keyInfo, X509Certificate issuerCert)
+            throws SecurityException, CertIOException, CertificateEncodingException {
     	StringBuilder sb = new StringBuilder();
     	String param = access.getSubjectCountry();
         if (param.length() > 0) { sb.append("C=").append(param).append(","); }
@@ -514,15 +473,14 @@ public class MyCode extends CodeV3 {
         param = access.getSubjectCommonName();
         if (param.length() > 0) { sb.append("CN=").append(param).append(","); }
         sb.setLength(sb.length() - 1);
-        X500Principal principal = new X500Principal(sb.toString());
-        X500Name subjectName = new X500Name(principal.getName());
+        X500Name subjectName = new X500Name(sb.toString());
         X500Name issuerName = subjectName;
         if (issuerCert != null) {
-        	issuerName = new X500Name(issuerCert.getIssuerX500Principal().getName());
+            issuerName = new JcaX509CertificateHolder(issuerCert).getSubject();
         }
 
         X509v3CertificateBuilder certBuilder = new X509v3CertificateBuilder(
-        		issuerName, new BigInteger(access.getSerialNumber()), 
+        		issuerName, new BigInteger(access.getSerialNumber()),
         		access.getNotBefore(), access.getNotAfter(), 
         		subjectName, keyInfo);
 		
@@ -538,7 +496,7 @@ public class MyCode extends CodeV3 {
 		if (access.getKeyUsage()[8]) { usedKeys |= KeyUsage.decipherOnly; }
 		certBuilder.addExtension(Extension.keyUsage, access.isCritical(Constants.KU), new KeyUsage(usedKeys));
         
-        ArrayList<KeyPurposeId> keyPurposeIds = new ArrayList<KeyPurposeId>();
+        ArrayList<KeyPurposeId> keyPurposeIds = new ArrayList<>();
 		if (access.getExtendedKeyUsage()[0]) { keyPurposeIds.add(KeyPurposeId.anyExtendedKeyUsage); }
 		if (access.getExtendedKeyUsage()[1]) { keyPurposeIds.add(KeyPurposeId.id_kp_serverAuth); }
 		if (access.getExtendedKeyUsage()[2]) { keyPurposeIds.add(KeyPurposeId.id_kp_clientAuth);  }
@@ -547,17 +505,17 @@ public class MyCode extends CodeV3 {
 		if (access.getExtendedKeyUsage()[5]) { keyPurposeIds.add(KeyPurposeId.id_kp_timeStamping); }
 		if (access.getExtendedKeyUsage()[6]) { keyPurposeIds.add(KeyPurposeId.id_kp_OCSPSigning); }
 		certBuilder.addExtension(Extension.extendedKeyUsage, access.isCritical(Constants.EKU), 
-				new ExtendedKeyUsage(keyPurposeIds.toArray(new KeyPurposeId[keyPurposeIds.size()])));
+				new ExtendedKeyUsage(keyPurposeIds.toArray(new KeyPurposeId[0])));
 		
 		for (int id = 0; id < 10; id++) {
 			String [] altNames = access.getAlternativeName(id);
 			if (altNames.length > 0) {
 				ArrayList<GeneralName> genNames = new ArrayList<>();
-				for (int i = 0; i < altNames.length; i++) {
-					genNames.add(new GeneralName(GeneralName.rfc822Name, altNames[i]));
-				}
+                for (String altName : altNames) {
+                    genNames.add(new GeneralName(GeneralName.rfc822Name, altName));
+                }
 				certBuilder.addExtension(Extension.subjectAlternativeName, access.isCritical(Constants.SAN),
-	            		new GeneralNames(genNames.toArray(new GeneralName[genNames.size()])));
+	            		new GeneralNames(genNames.toArray(new GeneralName[0])));
 	            break;
 			}
 		}
@@ -569,27 +527,23 @@ public class MyCode extends CodeV3 {
 	public boolean signCSR(String file, String keypair_name, String algorithm) {
 		try {
 			X509Certificate issuerCert = (X509Certificate) keyStore.getCertificate(keypair_name);
-			SubjectPublicKeyInfo keyInfo = loadedCSR.getSubjectPublicKeyInfo(); 
-					// generateKeypair(Integer.parseInt(access.getPublicKeyParameter()));
+			SubjectPublicKeyInfo keyInfo = loadedCSR.getSubjectPublicKeyInfo();
 			PrivateKey privateKey = (PrivateKey) keyStore.getKey(keypair_name, keyStorePass);
 		    ContentSigner contentSigner = new JcaContentSignerBuilder(algorithm).build(privateKey);
-		    X509v3CertificateBuilder certBuilder = pullCertificate(keyInfo, issuerCert);
+            X509v3CertificateBuilder certBuilder = pullCertificate(keyInfo, issuerCert);
 		    X509Certificate cert = new JcaX509CertificateConverter().setProvider(BCProvider).getCertificate(certBuilder.build(contentSigner));
-		    
 		    java.security.cert.Certificate[] oldChain = keyStore.getCertificateChain(keypair_name);
 		    java.security.cert.Certificate[] chain = new java.security.cert.Certificate[oldChain.length + 1];
 		    chain[0] = cert;
-		    for (int i = 1; i < chain.length; i++) {
-		    	chain[i] = oldChain[i - 1];
-		    }
-		    ArrayList<JcaX509CertificateHolder> holders = new ArrayList<JcaX509CertificateHolder>();
-            for(int i = 0; i < chain.length; i++){
-                JcaX509CertificateHolder holder = new JcaX509CertificateHolder((X509Certificate) chain[i]);
+		    System.arraycopy(oldChain, 0, chain, 1, chain.length - 1);
+		    ArrayList<JcaX509CertificateHolder> holders = new ArrayList<>();
+            for (Certificate aChain : chain) {
+                JcaX509CertificateHolder holder = new JcaX509CertificateHolder((X509Certificate) aChain);
                 holders.add(holder);
             }
             CMSTypedData cmsTypedData = new CMSProcessableByteArray(cert.getEncoded());
             CMSSignedDataGenerator cmsSignedDataGenerator = new CMSSignedDataGenerator();
-            CollectionStore<JcaX509CertificateHolder> genStore = new CollectionStore<JcaX509CertificateHolder>(holders);
+            CollectionStore<JcaX509CertificateHolder> genStore = new CollectionStore<>(holders);
             cmsSignedDataGenerator.addCertificates(genStore);
             CMSSignedData cmsSignedData = cmsSignedDataGenerator.generate(cmsTypedData, true);
 
@@ -598,8 +552,7 @@ public class MyCode extends CodeV3 {
             fos.flush();
             fos.close();
 			return true;
-        } catch (NoSuchAlgorithmException | NoSuchProviderException | SecurityException | 
-        		KeyStoreException | CertificateException | OperatorCreationException | InvalidKeyException | SignatureException | IOException | UnrecoverableKeyException | CMSException e) {
+        } catch (IOException | KeyStoreException | NoSuchAlgorithmException | UnrecoverableKeyException | OperatorCreationException | CertificateException | CMSException e) {
             e.printStackTrace();
             return false;
         }
@@ -612,16 +565,14 @@ public class MyCode extends CodeV3 {
 	}
 
 	private KeyPair generateKeypair(Integer keySize) throws NoSuchAlgorithmException, NoSuchProviderException {
-		KeyPairGenerator keyGen = null;
+		KeyPairGenerator keyGen;
 		if (access.getPublicKeyDigestAlgorithm().endsWith("RSA")) {
 			keyGen = KeyPairGenerator.getInstance("RSA", "BC");
 		} else {
 			keyGen = KeyPairGenerator.getInstance("DSA", "BC");
 		}
         keyGen.initialize(keySize, new SecureRandom());
-        KeyPair keyPair = keyGen.generateKeyPair();
-
-        return keyPair;
+        return keyGen.generateKeyPair();
 	}
 
 }

@@ -1,5 +1,6 @@
 .classpath
 .project
 .settings/
-key_store
 bin/
+.idea/
+ZPProject.iml
